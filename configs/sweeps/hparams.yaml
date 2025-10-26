@@ -1,0 +1,13 @@
+﻿experiments:
+  - config: configs/cifar10_baseline.yaml
+    overrides:
+      optim:
+        lr: 0.03
+      dataset:
+        aug: configs/aug/strong.yaml
+  - config: configs/imagenet_subset_baseline.yaml
+    overrides:
+      optim:
+        lr: 0.0003
+      sched:
+        gamma: 0.5

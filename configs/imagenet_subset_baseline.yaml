@@ -1,0 +1,42 @@
+﻿experiment: imagenet_subset_baseline
+output_dir: runs/${experiment}
+
+dataset:
+  name: imagenet_subset
+  root: ImageNetSubset
+  batch_size: 96
+  num_workers: 8
+  img_size: 224
+  aug: configs/aug/strong.yaml
+  val_split: 0.1
+  download: false
+  pin_memory: true
+
+model:
+  name: convnext_tiny
+  pretrained: true
+  dropout: 0.0
+
+optim:
+  name: adamw
+  lr: 0.0005
+  weight_decay: 0.03
+
+sched:
+  name: step
+  epochs: 40
+  warmup_epochs: 5
+  step_size: 8
+  gamma: 0.6
+  min_lr: 1e-5
+
+train:
+  amp: true
+  grad_clip_norm: 1.0
+  early_stop_patience: 10
+  label_smoothing: 0.1
+
+logging:
+  wandb: false
+
+seeds: [0, 1, 2]

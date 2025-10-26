@@ -1,0 +1,8 @@
+﻿name: weak
+random_crop: true
+random_flip: true
+color_jitter: null
+auto_augment: null
+random_erasing: 0.0
+mixup_alpha: 0.0
+cutmix_alpha: 0.0

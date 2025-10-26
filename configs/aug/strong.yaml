@@ -1,0 +1,8 @@
+﻿name: strong
+random_crop: true
+random_flip: true
+color_jitter: 0.2
+auto_augment: imagenet
+random_erasing: 0.1
+mixup_alpha: 0.2
+cutmix_alpha: 0.15

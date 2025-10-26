@@ -1,0 +1,44 @@
+﻿experiment: cifar10_baseline
+output_dir: runs/${experiment}
+
+dataset:
+  name: cifar10
+  root: data/cifar10
+  batch_size: 256
+  num_workers: 8
+  img_size: 128
+  aug: configs/aug/weak.yaml
+  val_split: 0.1
+  download: true
+  pin_memory: true
+
+model:
+  name: resnet18
+  pretrained: true
+  dropout: 0.0
+
+optim:
+  name: sgd
+  lr: 0.05
+  weight_decay: 0.0005
+  momentum: 0.9
+
+sched:
+  name: cosine
+  epochs: 60
+  warmup_epochs: 5
+  step_size: 30
+  gamma: 0.1
+  min_lr: 0.0005
+
+train:
+  amp: true
+  grad_clip_norm: 1.0
+  early_stop_patience: 15
+  label_smoothing: 0.05
+
+logging:
+  wandb: false
+  project: xai-proj-b
+
+seeds: [0, 1, 2]

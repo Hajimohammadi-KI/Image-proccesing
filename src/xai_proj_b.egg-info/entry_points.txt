@@ -1,0 +1,2 @@
+[console_scripts]
+xai-proj-b = xai_proj_b.cli:main

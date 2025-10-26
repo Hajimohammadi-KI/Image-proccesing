@@ -1,0 +1,27 @@
+# xAI Project B · Copilot Guide
+- **Scope**: Reproducible PyTorch pipeline for CIFAR-10, an ImageNet subset, and a student "own_dataset" robustness split with ≥3 seeds per run.
+- **Primary entry**: `src/xai_proj_b/cli.py` dispatches `train|evaluate|robustness|sweep`; script stubs in `scripts/` forward to the same parser.
+- **Configs**: YAML files under `configs/` map directly onto dataclasses in `utils/config.py`; when adding keys, extend the dataclass definitions or they will be dropped.
+- **Overrides**: CLI flags (`--aug`, `--dataset-root`, `--output-dir`, `--seeds`) merge through `_load_with_overrides`; `--aug weak`/`strong` auto-resolve to `configs/aug/*.yaml`.
+- **Output layout**: `ExperimentConfig.expanded_output_dir()` expands `runs/${experiment}`; each run writes `timestamp/seed_<n>/` with `config_resolved.yaml`, `metrics.csv`, `best.pt`, `last.pt`, confusion plots, and `SUMMARY.{json,md}`.
+- **Seed loop**: `train.loop.run_training` iterates `cfg.seeds`, calling `utils.seed.set_seed`; expect aggregation via `_aggregate_results` producing mean/std stats.
+- **Aug policies**: `data/transforms.py` consumes `AugmentationParams` YAML (mixup/cutmix, auto augment, erasing). Mixup/cutmix coefficients feed back into the training loop via `aug_params`.
+- **Dataloaders**: `data/loaders.py` always enables deterministic worker seeding (`worker_init_fn`) and halves val loader workers; respect `DatasetConfig` flags when extending.
+- **Dataset registry**: `data/datasets.py` currently handles `cifar10`, `imagenet_subset`, `own_dataset`; new datasets should follow the same pattern and update tests if class sets change.
+- **Own dataset rules**: `_validate_own_dataset` enforces filename regex `studentID_phoneID_class-name_XXXX.jpg`; reuse it (and `scripts/validate_own_dataset.py`) before trusting custom data.
+- **Robust set builder**: `eval/robustness_dataset.py` corrupts CIFAR-10 with JPEG/noise/blur/etc. and records metadata; keep `CORRUPTIONS` declarative to add new attacks.
+- **Model factory**: `models/factory.py` delegates to `timm.create_model` and resets classifiers; ensure new heads preserve `num_classes` wiring.
+- **Optim/sched**: `train.loop` maps config names (`sgd|adam|adamw`, `cosine|step|plateau`) onto torch optimizers; update `_build_*` helpers when introducing new options.
+- **Metrics**: `train/metrics.py` relies on `torchmetrics` for acc@1/5, macro precision/recall, per-class stats, and confusion matrices; any metric additions should go through `MetricTracker` to keep logging consistent.
+- **Evaluation workflow**: `eval/evaluate.py` reuses the config for dataloaders, reloads checkpoints, and writes confusion/per-class JSON into `<output_dir>/eval/`.
+- **Robustness CLI**: `eval/robustness.py` simply forces `dataset.name = own_dataset`; keep that pathway augmentation-free.
+- **Checkpoint I/O**: `utils/checkpoint.py` (see package) wraps torch.save/load; `best.pt` snapshot contains optimizer + class names for downstream analysis.
+- **Logging**: `utils/logging.setup_logging` writes per-seed logs; enable W&B via YAML (`logging.wandb: true`). Fail fast if wandb missing.
+- **Make targets**: `Makefile` includes `setup`, `format`, `test`, `train`, `eval`, `robustness`, `clean`; prefer these for reproducible workflows.
+- **Tests**: Pytest suite covers CLI parsing, own_dataset rules, transform determinism, and seeding; run `pytest -q` before major changes and extend tests alongside new features.
+- **Data prep scripts**: `prepare_imagenet_subset.py`, `build_robust_dataset.py`, and `validate_own_dataset.py` implement expected directory structures—keep CLI signatures stable for reproducibility docs.
+- **Colab**: `notebooks/colab_quickstart.ipynb` assumes `requirements.txt` install; preserve light dependencies and CPU fallbacks.
+- **Dependencies**: See `pyproject.toml`; project targets Python ≥3.10, PyTorch ≥2.2, CUDA optional (AMP auto-disables on CPU).
+- **Source layout**: Stick to the existing module boundaries (`data`, `models`, `train`, `eval`, `utils`) to avoid circular imports; prefer composition over inheritance per INSTRUCTION.md.
+- **Artifacts**: Every run should emit confusion PNG + per-class JSON; maintain this contract when altering evaluation/training outputs.
+- **Style tooling**: Formatting via Black (line-length 100), isort, Ruff; respect when contributing new code or CLI scripts.
