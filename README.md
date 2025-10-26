@@ -105,5 +105,4 @@ Tests live under `tests/` (pytest), and a lightweight Colab notebook sits at `no
 3. For subsequent updates: `git add -u`, `git commit -m "..."; git push`.
 
 ## Contact & licensing
-- Maintainer: Elahe - elahe@example.com
 - Code: MIT (specify in your submission if different). User-provided images remain under their original licenses.
