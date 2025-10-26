@@ -64,17 +64,54 @@ Override on the fly with CLI flags (`--aug strong`, `--dataset-root ImageNetSubs
 3. **Interpret metrics**: inspect `SUMMARY.json` for mean+/-std scores, and open `confusion.png` for failure analysis.
 
 ## Google Colab usage
-1. Open `notebooks/colab_quickstart.ipynb` in Colab (or upload it) and set the runtime to **GPU**.
-2. Run the first cell to `pip install -r requirements.txt` (installs CPU wheels that also work with Colab GPUs).
-3. Mount Drive if your `ImageNetSubset/` or `data/own_dataset/` live there, e.g.:
+1. **Create the notebook**  
+   - Open [colab.research.google.com](https://colab.research.google.com), click “New Notebook”, then choose *Runtime → Change runtime type → GPU*.
+
+2. **Clone the repo**
+   ```python
+   !git clone https://github.com/Hajimohammadi-KI/Image-proccesing.git
+   %cd /content/Image-proccesing
+   ```
+
+3. **Install requirements** (CPU wheels work fine on Colab GPUs)
+   ```python
+   %pip install -r requirements.txt
+   ```
+
+4. **Mount Google Drive (optional)**  
+   Needed if the ImageNet subset or custom dataset lives in Drive.
    ```python
    from google.colab import drive
-   drive.mount("/content/drive")
+   drive.mount('/content/drive')
    !ln -s /content/drive/MyDrive/ImageNetSubset ImageNetSubset
+   !ln -s /content/drive/MyDrive/data/own_dataset data/own_dataset
    ```
-4. Execute the training cell: `!python -m xai_proj_b.cli train --config configs/cifar10_baseline.yaml --output-dir /content/runs`.
-5. Evaluate on CIFAR-10 or the robustness dataset with the final cell or custom CLI commands (e.g., `python -m xai_proj_b.cli robustness ...`).
-6. Download `runs/<experiment>/...` or copy them back to Drive when the notebook finishes.
+
+5. **Train**
+   ```python
+   !python -m xai_proj_b.cli train --config configs/cifar10_baseline.yaml --output-dir /content/runs
+   ```
+   Adjust `--config`, `--dataset-root`, `--aug`, or `--seeds` as needed.
+
+6. **Evaluate**
+   ```python
+   !python -m xai_proj_b.cli evaluate --config configs/cifar10_baseline.yaml \
+       --checkpoint /content/runs/cifar10_baseline/*/seed_0/best.pt --dataset cifar10
+   ```
+   For robustness on your own dataset:
+   ```python
+   !python -m xai_proj_b.cli robustness --config configs/cifar10_baseline.yaml \
+       --checkpoint /content/runs/cifar10_baseline/*/seed_0/best.pt --data-root data/own_dataset
+   ```
+
+7. **Save artifacts**  
+   Copy results back to Drive or download:
+   ```python
+   !cp -r /content/runs /content/drive/MyDrive/runs_backup
+   ```
+   or use the Colab file browser to download specific folders.
+
+> Tip: instead of typing these commands manually, upload `notebooks/colab_quickstart.ipynb` from the repo and run it top-to-bottom; it already contains the cells above.
 
 ## Code layout
 ```
