@@ -10,7 +10,7 @@ from torchvision import datasets
 from ..utils.config import DatasetConfig
 from .transforms import AugmentationParams, build_eval_transforms, build_train_transforms
 
-OWN_CLASSES = [
+OWN_DATASET_CLASSES = [
     "coffee_mug",
     "wooden_spoon",
     "notebook",
@@ -80,9 +80,8 @@ def _validate_own_dataset(directory: Path) -> None:
         if not class_dir.is_dir():
             continue
         normalized = normalize_name(class_dir.name)
-        if normalized not in OWN_CLASSES:
+        if normalized not in OWN_DATASET_CLASSES:
             raise ValueError(f"Unexpected class '{class_dir.name}' in {directory}")
         for img_path in class_dir.glob("*.jp*g"):
             if not OWN_PATTERN.match(img_path.name):
                 raise ValueError(f"Invalid filename '{img_path.name}' in {img_path.parent}")
-

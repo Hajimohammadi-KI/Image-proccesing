@@ -118,6 +118,15 @@ Override on the fly with CLI flags (`--aug strong`, `--dataset-root ImageNetSubs
 
 > Tip: instead of typing these commands manually, upload `notebooks/colab_quickstart.ipynb` from the repo and run it top-to-bottom; it already contains the cells above.
 
+## Progress dashboard (local browser)
+1. Start a training run (CPU or GPU). Each new run folder writes `progress.json` after every epoch.
+2. Serve the dashboard:
+   ```powershell
+   python scripts/serve_progress.py --run-dir runs/cpu_cifar10/<timestamp>
+   ```
+   Replace `<timestamp>` with the folder created for your run. The script copies `progress_dashboard.html` into that directory and opens it in your browser.
+3. The HTML/JS page polls `progress.json` every few seconds and shows percent complete, train/val loss, accuracy, and elapsed time. Leave the server running until training finishes.
+
 ## Code layout
 ```
 configs/                 # YAML configs + augmentation presets + sweep definitions
@@ -129,6 +138,7 @@ src/xai_proj_b/          # Installable package (pip install -e .)
 |-- models/              # timm-backed factory + classifier heads
 |-- train/               # training loop, callbacks, metrics, summaries
 |-- eval/                # evaluation + robustness helpers and dataset builder
+web/                     # Static assets (progress dashboard template)
 runs/, data/, wandb/     # git-ignored experiment outputs
 ```
 Tests live under `tests/` (pytest), and a lightweight Colab notebook sits at `notebooks/colab_quickstart.ipynb` for remote execution.

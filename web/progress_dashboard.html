@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Training Progress</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --accent: #0078d4;
+        --bg: #f5f5f5;
+        --card: #ffffff;
+        --text: #222;
+      }
+      body {
+        font-family: Arial, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        margin: 0;
+        padding: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+      }
+      .card {
+        background: var(--card);
+        border-radius: 12px;
+        padding: 32px;
+        width: min(640px, 90vw);
+        box-shadow: 0 12px 30px rgba(0, 0, 0, 0.08);
+      }
+      h1 {
+        margin-top: 0;
+        font-size: 1.5rem;
+      }
+      .progress-wrapper {
+        background: #e0e0e0;
+        border-radius: 8px;
+        height: 24px;
+        overflow: hidden;
+        margin: 16px 0;
+      }
+      .progress-bar {
+        height: 100%;
+        width: 0%;
+        background: linear-gradient(90deg, var(--accent), #4cc9f0);
+        transition: width 0.4s ease;
+      }
+      .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 12px;
+        margin-top: 20px;
+      }
+      .stat {
+        background: #fafafa;
+        border-radius: 8px;
+        padding: 12px;
+        text-align: center;
+        border: 1px solid #ededed;
+      }
+      .stat-label {
+        font-size: 0.85rem;
+        color: #666;
+      }
+      .stat-value {
+        font-size: 1.1rem;
+        font-weight: bold;
+        margin-top: 6px;
+      }
+      .status {
+        font-weight: bold;
+        margin-top: 10px;
+      }
+      .timestamp {
+        margin-top: 8px;
+        color: #666;
+        font-size: 0.85rem;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h1>Training Progress</h1>
+      <div class="progress-wrapper">
+        <div class="progress-bar" id="progress-bar"></div>
+      </div>
+      <div id="progress-text">Waiting for data...</div>
+      <div class="stats-grid">
+        <div class="stat">
+          <div class="stat-label">Status</div>
+          <div class="stat-value" id="status">-</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Train Loss</div>
+          <div class="stat-value" id="train-loss">-</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Val Loss</div>
+          <div class="stat-value" id="val-loss">-</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Val Acc@1</div>
+          <div class="stat-value" id="val-acc">-</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Elapsed</div>
+          <div class="stat-value" id="elapsed">-</div>
+        </div>
+      </div>
+      <div class="timestamp" id="timestamp"></div>
+    </div>
+
+    <script>
+      async function fetchProgress() {
+        try {
+          const response = await fetch("progress.json?ts=" + Date.now());
+          if (!response.ok) {
+            throw new Error("Progress file not available yet");
+          }
+          const data = await response.json();
+          updateUI(data);
+        } catch (err) {
+          document.getElementById("progress-text").textContent = err.message;
+        }
+      }
+
+      function formatNumber(num, digits = 4) {
+        if (num === null || num === undefined) return "-";
+        return Number(num).toFixed(digits);
+      }
+
+      function formatDuration(seconds) {
+        if (!seconds) return "-";
+        const mins = Math.floor(seconds / 60);
+        const secs = Math.floor(seconds % 60);
+        return `${mins}m ${secs}s`;
+      }
+
+      function updateUI(data) {
+        const percent =
+          data.total_epochs > 0
+            ? Math.min(
+                100,
+                Math.round((data.current_epoch / data.total_epochs) * 100)
+              )
+            : 0;
+        document.getElementById("progress-bar").style.width = percent + "%";
+        document.getElementById(
+          "progress-text"
+        ).textContent = `${percent}% (${data.current_epoch}/${data.total_epochs})`;
+
+        document.getElementById("status").textContent =
+          data.status ?? "unknown";
+        document.getElementById("train-loss").textContent = formatNumber(
+          data.train_loss
+        );
+        document.getElementById("val-loss").textContent = formatNumber(
+          data.val_loss
+        );
+        document.getElementById("val-acc").textContent = formatNumber(
+          data.val_acc1
+        );
+        document.getElementById("elapsed").textContent = formatDuration(
+          data.elapsed_sec
+        );
+        document.getElementById("timestamp").textContent =
+          "Updated: " + new Date().toLocaleTimeString();
+      }
+
+      fetchProgress();
+      setInterval(fetchProgress, 5000);
+    </script>
+  </body>
+</html>
+

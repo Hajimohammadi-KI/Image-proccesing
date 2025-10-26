@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import time
 from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
@@ -29,6 +30,21 @@ def run_training(cfg: ExperimentConfig) -> Dict[str, Dict[str, float]]:
     save_config(cfg, run_dir / "config_resolved.yaml")
     seed_results = []
     summary_entries = []
+
+    progress_path = run_dir / "progress.json"
+    run_start = time.time()
+    _write_progress(
+        progress_path,
+        {
+            "status": "initializing",
+            "current_epoch": 0,
+            "total_epochs": cfg.sched.epochs,
+            "train_loss": None,
+            "val_loss": None,
+            "val_acc1": None,
+            "elapsed_sec": 0.0,
+        },
+    )
 
     for seed in cfg.seeds:
         set_seed(seed, cfg.train.deterministic)
@@ -74,6 +90,19 @@ def run_training(cfg: ExperimentConfig) -> Dict[str, Dict[str, float]]:
             logger.info("Epoch %s | %s", epoch, metrics)
             if wandb_run:
                 wandb_run.log(metrics)
+
+            _write_progress(
+                progress_path,
+                {
+                    "status": "running",
+                    "current_epoch": epoch,
+                    "total_epochs": cfg.sched.epochs,
+                    "train_loss": metrics["train_loss"],
+                    "val_loss": metrics["val_loss"],
+                    "val_acc1": metrics.get("val_acc1"),
+                    "elapsed_sec": time.time() - run_start,
+                },
+            )
 
             if val_stats.metrics.get("acc1", 0.0) > best_metric:
                 best_metric = val_stats.metrics["acc1"]
@@ -129,6 +158,18 @@ def run_training(cfg: ExperimentConfig) -> Dict[str, Dict[str, float]]:
     summary_path = run_dir / "SUMMARY.json"
     summary_path.write_text(json.dumps(summary_payload, indent=2), encoding="utf-8")
     _write_summary_md(run_dir / "SUMMARY.md", cfg, summary_payload)
+    _write_progress(
+        progress_path,
+        {
+            "status": "completed",
+            "current_epoch": cfg.sched.epochs,
+            "total_epochs": cfg.sched.epochs,
+            "train_loss": history[-1]["train_loss"] if history else None,
+            "val_loss": history[-1]["val_loss"] if history else None,
+            "val_acc1": history[-1].get("val_acc1") if history else None,
+            "elapsed_sec": time.time() - run_start,
+        },
+    )
     return summary
 
 
@@ -336,3 +377,8 @@ def _write_summary_md(path: Path, cfg: ExperimentConfig, payload: Dict[str, Any]
     for key, value in payload["aggregate"].items():
         lines.append(f"- {key}: {value:.4f}")
     path.write_text("\n".join(lines), encoding="utf-8")
+
+
+def _write_progress(path: Path, payload: Dict[str, Any]) -> None:
+    safe_payload = {k: (float(v) if isinstance(v, (int, float)) else v) for k, v in payload.items()}
+    path.write_text(json.dumps(safe_payload, indent=2), encoding="utf-8")
