@@ -27,11 +27,14 @@ class DatasetConfig:
     num_workers: int
     img_size: Optional[int] = None
     aug: Optional[str] = None
-    val_split: float = 0.1
+    val_batch_size: Optional[int] = None
     download: bool = True
     pin_memory: bool = True
-    persist_workers: bool = False
+    persistent_workers: bool = False
     drop_last: bool = False
+    shuffle: bool = True
+    train_subdir: str = "train"
+    val_subdir: str = "val"
 
 
 @dataclass
@@ -154,4 +157,3 @@ def dataclass_to_dict(obj: Any) -> Dict[str, Any]:
 def save_config(cfg: ExperimentConfig, path: str | os.PathLike[str]) -> None:
     with open(path, "w", encoding="utf-8") as fp:
         yaml.safe_dump(dataclass_to_dict(cfg), fp, sort_keys=False)
-

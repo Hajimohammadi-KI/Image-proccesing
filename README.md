@@ -78,7 +78,12 @@ Override on the fly with CLI flags (`--aug strong`, `--dataset-root ImageNetSubs
    %pip install -r requirements.txt
    ```
 
-4. **Mount Google Drive (optional)**  
+4. **Install the repo itself (editable mode so `xai_proj_b` resolves)**
+   ```python
+   %pip install -e .
+   ```
+
+5. **Mount Google Drive (optional)**  
    Needed if the ImageNet subset or custom dataset lives in Drive.
    ```python
    from google.colab import drive
@@ -87,13 +92,13 @@ Override on the fly with CLI flags (`--aug strong`, `--dataset-root ImageNetSubs
    !ln -s /content/drive/MyDrive/data/own_dataset data/own_dataset
    ```
 
-5. **Train**
+6. **Train**
    ```python
    !python -m xai_proj_b.cli train --config configs/cifar10_baseline.yaml --output-dir /content/runs
    ```
    Adjust `--config`, `--dataset-root`, `--aug`, or `--seeds` as needed.
 
-6. **Evaluate**
+7. **Evaluate**
    ```python
    !python -m xai_proj_b.cli evaluate --config configs/cifar10_baseline.yaml \
        --checkpoint /content/runs/cifar10_baseline/*/seed_0/best.pt --dataset cifar10
@@ -104,7 +109,7 @@ Override on the fly with CLI flags (`--aug strong`, `--dataset-root ImageNetSubs
        --checkpoint /content/runs/cifar10_baseline/*/seed_0/best.pt --data-root data/own_dataset
    ```
 
-7. **Save artifacts**  
+8. **Save artifacts**  
    Copy results back to Drive or download:
    ```python
    !cp -r /content/runs /content/drive/MyDrive/runs_backup

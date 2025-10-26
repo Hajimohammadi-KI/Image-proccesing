@@ -7,7 +7,7 @@ __pycache__/
 *.coverage
 outputs/
 runs/
-data/
+/data/
 ImageNetSubset/
 robustness_dataset/
 .idea/
