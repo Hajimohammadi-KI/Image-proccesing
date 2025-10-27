@@ -3,8 +3,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { GaugeCard, StatCard } from '../components/StatCard';
 import type { ProgressData } from '../types/progress';
+import type { SystemStats } from '../types/system';
 
-const POLL_INTERVAL_MS = 5000;
+const POLL_INTERVAL_MS = 1000;
 
 function formatNumber(value: number | null | undefined, digits = 4): string {
   if (value === null || value === undefined || Number.isNaN(value)) {
@@ -80,6 +81,8 @@ function getProgressPercent(data: ProgressData | null): number {
 export default function DashboardPage() {
   const [data, setData] = useState<ProgressData | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [systemStats, setSystemStats] = useState<SystemStats | null>(null);
+  const [systemError, setSystemError] = useState<string | null>(null);
   const [timestamp, setTimestamp] = useState<Date | null>(null);
 
   useEffect(() => {
@@ -87,30 +90,56 @@ export default function DashboardPage() {
     let intervalId: ReturnType<typeof setInterval> | undefined;
 
     const fetchProgress = async () => {
+      const progressRequest = fetch(`/progress.json?ts=${Date.now()}`, {
+        cache: 'no-store'
+      });
+      const systemRequest = fetch(`/api/system?ts=${Date.now()}`, {
+        cache: 'no-store'
+      });
+
       try {
-        const response = await fetch(`/progress.json?ts=${Date.now()}`, {
-          cache: 'no-store'
-        });
-
-        if (!response.ok) {
-          throw new Error('Progress file not available yet');
-        }
-
-        const payload = (await response.json()) as ProgressData;
+        const [progressResponse, systemResponse] = await Promise.allSettled([
+          progressRequest,
+          systemRequest
+        ]);
 
         if (!isMounted) {
           return;
         }
 
-        setData(payload);
-        setTimestamp(new Date());
-        setError(null);
+        if (progressResponse.status === 'fulfilled' && progressResponse.value.ok) {
+          const payload = (await progressResponse.value.json()) as ProgressData;
+          setData(payload);
+          setTimestamp(new Date());
+          setError(null);
+        } else {
+          const reason =
+            progressResponse.status === 'rejected'
+              ? progressResponse.reason
+              : new Error('Progress file not available yet');
+          const message = reason instanceof Error ? reason.message : 'Failed to fetch progress';
+          setError(message);
+        }
+
+        if (systemResponse.status === 'fulfilled' && systemResponse.value.ok) {
+          const payload = (await systemResponse.value.json()) as SystemStats;
+          setSystemStats(payload);
+          setSystemError(null);
+        } else {
+          const reason =
+            systemResponse.status === 'rejected'
+              ? systemResponse.reason
+              : new Error('System stats unavailable');
+          const message = reason instanceof Error ? reason.message : 'Failed to fetch system stats';
+          setSystemError(message);
+        }
       } catch (err) {
         if (!isMounted) {
           return;
         }
-        const message = err instanceof Error ? err.message : 'Failed to fetch progress';
+        const message = err instanceof Error ? err.message : 'Failed to fetch dashboard data';
         setError(message);
+        setSystemError(message);
       }
     };
 
@@ -127,9 +156,18 @@ export default function DashboardPage() {
 
   const percent = useMemo(() => getProgressPercent(data), [data]);
 
-  const cpuPercent = useMemo(() => sanitizePercent(data?.cpu_percent), [data?.cpu_percent]);
-  const ramPercent = useMemo(() => sanitizePercent(data?.ram_percent), [data?.ram_percent]);
-  const gpuPercent = useMemo(() => sanitizePercent(data?.gpu_percent), [data?.gpu_percent]);
+  const cpuPercent = useMemo(
+    () => sanitizePercent(systemStats?.cpu_percent ?? data?.cpu_percent),
+    [systemStats?.cpu_percent, data?.cpu_percent]
+  );
+  const ramPercent = useMemo(
+    () => sanitizePercent(systemStats?.ram_percent ?? data?.ram_percent),
+    [systemStats?.ram_percent, data?.ram_percent]
+  );
+  const gpuPercent = useMemo(
+    () => sanitizePercent(systemStats?.gpu_percent ?? data?.gpu_percent),
+    [systemStats?.gpu_percent, data?.gpu_percent]
+  );
 
   const progressLabel = useMemo(() => {
     if (!data || !data.total_epochs || !data.current_epoch) {
@@ -156,17 +194,17 @@ export default function DashboardPage() {
           <GaugeCard
             label="CPU Engagement"
             percent={cpuPercent}
-            subtitle={formatPercent(data?.cpu_percent)}
+            subtitle={formatPercent(systemStats?.cpu_percent ?? data?.cpu_percent)}
           />
           <GaugeCard
             label="RAM Engagement"
             percent={ramPercent}
-            subtitle={formatPercent(data?.ram_percent)}
+            subtitle={formatPercent(systemStats?.ram_percent ?? data?.ram_percent)}
           />
           <GaugeCard
             label="GPU Engagement"
             percent={gpuPercent}
-            subtitle={formatPercent(data?.gpu_percent)}
+            subtitle={formatPercent(systemStats?.gpu_percent ?? data?.gpu_percent)}
           />
         </div>
 
@@ -178,7 +216,10 @@ export default function DashboardPage() {
           <StatCard label="Elapsed" value={formatElapsed(data?.elapsed_sec)} />
           <StatCard
             label="GPU Memory"
-            value={formatMemory(data?.gpu_memory_used, data?.gpu_memory_total)}
+            value={formatMemory(
+              systemStats?.gpu_memory_used ?? data?.gpu_memory_used,
+              systemStats?.gpu_memory_total ?? data?.gpu_memory_total
+            )}
           />
         </div>
 
@@ -187,6 +228,7 @@ export default function DashboardPage() {
         <div className="timestamp">
           Updated: {timestamp ? timestamp.toLocaleTimeString() : '—'}
         </div>
+        {systemError && <div className="statusText">System stats: {systemError}</div>}
       </div>
     </main>
   );
