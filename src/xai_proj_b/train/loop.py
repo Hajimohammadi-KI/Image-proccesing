@@ -10,7 +10,8 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, cast
 
 import torch
 import torch.nn as nn
-from torch.cuda.amp import GradScaler, autocast
+from torch.amp.autocast_mode import autocast
+from torch.amp.grad_scaler import GradScaler
 from torch.utils.data import DataLoader
 
 from ..data.loaders import create_dataloaders
@@ -80,7 +81,10 @@ def run_training(cfg: ExperimentConfig) -> Dict[str, float]:
         optimizer = _build_optimizer(model, cfg)
         scheduler = _build_scheduler(optimizer, cfg)
         criterion = nn.CrossEntropyLoss(label_smoothing=cfg.train.label_smoothing).to(_device())
-        scaler = GradScaler(enabled=cfg.train.amp and torch.cuda.is_available())
+        scaler = GradScaler(
+            "cuda",
+            enabled=cfg.train.amp and torch.cuda.is_available(),
+        )
         callbacks = EarlyStopping(cfg.train.early_stop_patience) if cfg.train.early_stop_patience else None
         wandb_run = init_wandb(cfg.logging, f"{cfg.experiment}-{timestamp}", seed, {"config": cfg.experiment})
 
@@ -304,7 +308,11 @@ def _train_epoch(
         targets = targets.to(device, non_blocking=True)
         optimizer.zero_grad(set_to_none=True)
 
-        with autocast(enabled=cfg.train.amp and torch.cuda.is_available()):
+        with autocast(
+            "cuda",
+            dtype=torch.bfloat16,
+            enabled=cfg.train.amp and torch.cuda.is_available(),
+        ):
             if mixup_alpha > 0 or cutmix_alpha > 0:
                 images, targets_a, targets_b, lam = _apply_mixup_cutmix(images, targets, mixup_alpha, cutmix_alpha)
                 outputs = model(images)

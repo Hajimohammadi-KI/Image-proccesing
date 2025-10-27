@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import csv
+import multiprocessing as mp
 import os
 import subprocess
 import threading
 import time
 from typing import Dict, Optional
+
+# cspell:ignore typeperf
 
 try:  # pragma: no cover - optional dependency
     import psutil  # type: ignore
@@ -102,8 +105,8 @@ class _SystemStatsMonitor:
             return {}
         stats: Dict[str, Optional[float]] = {}
 
-    # Windows exposes the same counters that Task Manager graphs via perf counters.
-    # Query them first so we can mirror its behavior before falling back to nvidia-smi.
+        # Windows exposes the same counters that Task Manager graphs via perf counters.
+        # Query them first so we can mirror its behavior before falling back to nvidia-smi.
         if os.name == "nt":
             percent = _read_windows_gpu_counter()
             if percent is not None:
@@ -113,7 +116,7 @@ class _SystemStatsMonitor:
         mem_stats = _read_cuda_memory()
         stats.update(mem_stats)
 
-    # If we are still missing utilization, fall back to nvidia-smi output as before.
+        # If we are still missing utilization, fall back to nvidia-smi output as before.
         if stats.get("gpu_percent") is None:
             try:
                 result = subprocess.run(
@@ -124,7 +127,7 @@ class _SystemStatsMonitor:
                     ],
                     capture_output=True,
                     text=True,
-                    timeout=1.0,
+                    timeout=2.0,
                     check=True,
                 )
                 first_line = result.stdout.strip().splitlines()[0]
@@ -262,9 +265,25 @@ def _read_cuda_memory() -> Dict[str, Optional[float]]:
     }
 
 
-_MONITOR = _SystemStatsMonitor(interval=1.0)
+_MONITOR: Optional[_SystemStatsMonitor] = None
+
+
+def _is_main_process() -> bool:
+    try:
+        return mp.current_process().name == "MainProcess"
+    except Exception:
+        return True
+
+
+if _is_main_process() and os.environ.get("XAI_DISABLE_SYSTEM_STATS") != "1":
+    try:
+        _MONITOR = _SystemStatsMonitor(interval=1.0)
+    except Exception:
+        _MONITOR = None
 
 
 def get_system_stats() -> Dict[str, Optional[float]]:
     """Return the latest system stats snapshot."""
+    if _MONITOR is None:
+        return {key: None for key in _CPU_KEYS}
     return _MONITOR.snapshot()
