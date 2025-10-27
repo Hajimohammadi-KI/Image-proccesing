@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import os
-import subprocess
 import time
 from collections import defaultdict
 from datetime import datetime
@@ -14,16 +13,12 @@ import torch.nn as nn
 from torch.cuda.amp import GradScaler, autocast
 from torch.utils.data import DataLoader
 
-try:
-    import psutil
-except ImportError:  # pragma: no cover
-    psutil = None  # type: ignore
-
 from ..data.loaders import create_dataloaders
 from ..models.factory import create_model
 from ..utils import checkpoint
 from ..utils.config import ExperimentConfig, save_config
 from ..utils.logging import init_wandb, setup_logging
+from ..utils.system_stats import get_system_stats
 from ..utils.seed import set_seed
 from .callbacks import EarlyStopping
 from .metrics import MetricTracker, plot_confusion
@@ -455,37 +450,4 @@ def _mirror_progress(payload: Dict[str, Any]) -> None:
 
 
 def _collect_system_stats() -> Dict[str, Any]:
-    stats: Dict[str, Any] = {
-        "cpu_percent": None,
-        "ram_percent": None,
-        "gpu_percent": None,
-        "gpu_memory_used": None,
-        "gpu_memory_total": None,
-    }
-    if psutil is not None:
-        try:
-            stats["cpu_percent"] = psutil.cpu_percent(interval=None)
-            stats["ram_percent"] = psutil.virtual_memory().percent
-        except Exception:
-            pass
-    if torch.cuda.is_available():
-        try:
-            result = subprocess.run(
-                [
-                    "nvidia-smi",
-                    "--query-gpu=utilization.gpu,memory.used,memory.total",
-                    "--format=csv,noheader,nounits",
-                ],
-                capture_output=True,
-                text=True,
-                check=True,
-                timeout=1.0,
-            )
-            first_line = result.stdout.strip().splitlines()[0]
-            util_str, mem_used_str, mem_total_str = [part.strip() for part in first_line.split(",")]
-            stats["gpu_percent"] = float(util_str)
-            stats["gpu_memory_used"] = float(mem_used_str)
-            stats["gpu_memory_total"] = float(mem_total_str)
-        except Exception:
-            pass
-    return stats
+    return get_system_stats()

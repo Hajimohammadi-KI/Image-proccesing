@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { GaugeCard, StatCard } from '../components/StatCard';
 import type { ProgressData } from '../types/progress';
 
-const POLL_INTERVAL_MS = 5000;
+const POLL_INTERVAL_MS = 1000;
 
 function formatNumber(value: number | null | undefined, digits = 4): string {
   if (value === null || value === undefined || Number.isNaN(value)) {
