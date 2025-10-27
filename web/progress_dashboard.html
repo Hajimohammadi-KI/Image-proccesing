@@ -107,6 +107,22 @@
           <div class="stat-label">Elapsed</div>
           <div class="stat-value" id="elapsed">-</div>
         </div>
+        <div class="stat">
+          <div class="stat-label">CPU Load</div>
+          <div class="stat-value" id="cpu-load">-</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">RAM Usage</div>
+          <div class="stat-value" id="ram-load">-</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">GPU Load</div>
+          <div class="stat-value" id="gpu-load">-</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">GPU Memory</div>
+          <div class="stat-value" id="gpu-mem">-</div>
+        </div>
       </div>
       <div class="timestamp" id="timestamp"></div>
     </div>
@@ -137,6 +153,22 @@
         return `${mins}m ${secs}s`;
       }
 
+      function formatPercent(value, digits = 0) {
+        if (value === null || value === undefined || isNaN(value)) return "-";
+        return `${Number(value).toFixed(digits)}%`;
+      }
+
+      function formatMemory(used, total) {
+        if (
+          used === null ||
+          used === undefined ||
+          total === null ||
+          total === undefined
+        )
+          return "-";
+        return `${Number(used).toFixed(0)} / ${Number(total).toFixed(0)} MB`;
+      }
+
       function updateUI(data) {
         const percent =
           data.total_epochs > 0
@@ -164,6 +196,19 @@
         document.getElementById("elapsed").textContent = formatDuration(
           data.elapsed_sec
         );
+        document.getElementById("cpu-load").textContent = formatPercent(
+          data.cpu_percent
+        );
+        document.getElementById("ram-load").textContent = formatPercent(
+          data.ram_percent
+        );
+        document.getElementById("gpu-load").textContent = formatPercent(
+          data.gpu_percent
+        );
+        document.getElementById("gpu-mem").textContent = formatMemory(
+          data.gpu_memory_used,
+          data.gpu_memory_total
+        );
         document.getElementById("timestamp").textContent =
           "Updated: " + new Date().toLocaleTimeString();
       }
@@ -173,4 +218,3 @@
     </script>
   </body>
 </html>
-

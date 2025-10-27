@@ -1,4 +1,4 @@
-﻿name: xai-proj-b
+name: xai-proj-b
 channels:
   - pytorch
   - nvidia
@@ -10,8 +10,7 @@ dependencies:
   - torchaudio
   - cuda-toolkit=12.6
   - pip
-  - pip:
-      - torch==2.9.0
+  - pip:\n      - psutil==5.9.8\n      - torch==2.9.0
       - torchvision==0.24.0
       - torchaudio==2.9.0
       - timm==1.0.21
@@ -29,3 +28,6 @@ dependencies:
       - black==24.10.0
       - ruff==0.7.1
       - isort==5.13.2
+
+
+

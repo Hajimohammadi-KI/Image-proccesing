@@ -1,16 +1,23 @@
 from __future__ import annotations
 
 import json
+import os
+import subprocess
 import time
 from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple, cast
 
 import torch
 import torch.nn as nn
 from torch.cuda.amp import GradScaler, autocast
 from torch.utils.data import DataLoader
+
+try:
+    import psutil
+except ImportError:  # pragma: no cover
+    psutil = None  # type: ignore
 
 from ..data.loaders import create_dataloaders
 from ..models.factory import create_model
@@ -22,7 +29,19 @@ from .callbacks import EarlyStopping
 from .metrics import MetricTracker, plot_confusion
 
 
-def run_training(cfg: ExperimentConfig) -> Dict[str, Dict[str, float]]:
+_PUBLIC_PROGRESS_OVERRIDE = os.getenv("XAI_PROGRESS_PUBLIC_PATH")
+_PUBLIC_PROGRESS_PATH = None
+if _PUBLIC_PROGRESS_OVERRIDE:
+    _PUBLIC_PROGRESS_PATH = Path(_PUBLIC_PROGRESS_OVERRIDE)
+else:
+    for candidate in Path(__file__).resolve().parents:
+        potential = candidate / "web" / "progress-dashboard" / "public" / "progress.json"
+        if potential.parent.exists():
+            _PUBLIC_PROGRESS_PATH = potential
+            break
+
+
+def run_training(cfg: ExperimentConfig) -> Dict[str, float]:
     output_root = cfg.expanded_output_dir()
     timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     run_dir = output_root / timestamp
@@ -47,6 +66,8 @@ def run_training(cfg: ExperimentConfig) -> Dict[str, Dict[str, float]]:
     )
 
     for seed in cfg.seeds:
+        last_val_loss: Optional[float] = None
+        last_val_acc1: Optional[float] = None
         set_seed(seed, cfg.train.deterministic)
         seed_dir = run_dir / f"seed_{seed}"
         seed_dir.mkdir(parents=True, exist_ok=True)
@@ -67,6 +88,21 @@ def run_training(cfg: ExperimentConfig) -> Dict[str, Dict[str, float]]:
         best_state = None
 
         for epoch in range(1, cfg.sched.epochs + 1):
+            def update_progress(batch_idx: int, total_batches: int, avg_loss: float, avg_acc: float) -> None:
+                fractional_epoch = (epoch - 1) + (batch_idx / max(1, total_batches))
+                _write_progress(
+                    progress_path,
+                    {
+                        "status": "running",
+                        "current_epoch": fractional_epoch,
+                        "total_epochs": cfg.sched.epochs,
+                        "train_loss": avg_loss,
+                        "val_loss": last_val_loss,
+                        "val_acc1": last_val_acc1,
+                        "elapsed_sec": time.time() - run_start,
+                    },
+                )
+
             train_stats = _train_epoch(
                 model,
                 train_loader,
@@ -75,9 +111,13 @@ def run_training(cfg: ExperimentConfig) -> Dict[str, Dict[str, float]]:
                 scaler,
                 cfg,
                 aug_mix,
+                progress_hook=update_progress,
             )
             val_stats = _validate(model, val_loader, criterion, num_classes)
             scheduler_step(scheduler, val_stats.metrics.get("acc1", 0.0))
+
+            last_val_loss = val_stats.loss
+            last_val_acc1 = val_stats.metrics.get("acc1")
 
             metrics = {
                 "epoch": epoch,
@@ -158,15 +198,16 @@ def run_training(cfg: ExperimentConfig) -> Dict[str, Dict[str, float]]:
     summary_path = run_dir / "SUMMARY.json"
     summary_path.write_text(json.dumps(summary_payload, indent=2), encoding="utf-8")
     _write_summary_md(run_dir / "SUMMARY.md", cfg, summary_payload)
+    latest_metrics = summary_entries[-1] if summary_entries else {}
     _write_progress(
         progress_path,
         {
             "status": "completed",
             "current_epoch": cfg.sched.epochs,
             "total_epochs": cfg.sched.epochs,
-            "train_loss": history[-1]["train_loss"] if history else None,
-            "val_loss": history[-1]["val_loss"] if history else None,
-            "val_acc1": history[-1].get("val_acc1") if history else None,
+            "train_loss": latest_metrics.get("train_loss"),
+            "val_loss": latest_metrics.get("val_loss"),
+            "val_acc1": latest_metrics.get("val_acc1"),
             "elapsed_sec": time.time() - run_start,
         },
     )
@@ -188,17 +229,19 @@ def _build_optimizer(model: torch.nn.Module, cfg: ExperimentConfig):
             nesterov=True,
         )
     if cfg.optim.name.lower() == "adam":
+        betas = cast(Tuple[float, float], tuple(cfg.optim.betas or (0.9, 0.999)))
         return torch.optim.Adam(
             params,
             lr=cfg.optim.lr,
             weight_decay=cfg.optim.weight_decay,
-            betas=tuple(cfg.optim.betas or (0.9, 0.999)),
+            betas=betas,
         )
+    betas = cast(Tuple[float, float], tuple(cfg.optim.betas or (0.9, 0.999)))
     return torch.optim.AdamW(
         params,
         lr=cfg.optim.lr,
         weight_decay=cfg.optim.weight_decay,
-        betas=tuple(cfg.optim.betas or (0.9, 0.999)),
+        betas=betas,
     )
 
 
@@ -243,6 +286,7 @@ def _train_epoch(
     scaler: GradScaler,
     cfg: ExperimentConfig,
     aug_mix: Dict[str, float],
+    progress_hook: Optional[Callable[[int, int, float, float], None]] = None,
 ) -> Dict[str, float]:
     model.train()
     total_loss = 0.0
@@ -252,7 +296,9 @@ def _train_epoch(
     mixup_alpha = aug_mix.get("mixup", 0.0)
     cutmix_alpha = aug_mix.get("cutmix", 0.0)
 
-    for images, targets in loader:
+    total_batches = len(loader)
+
+    for batch_idx, (images, targets) in enumerate(loader, start=1):
         images = images.to(device, non_blocking=True)
         targets = targets.to(device, non_blocking=True)
         optimizer.zero_grad(set_to_none=True)
@@ -276,6 +322,10 @@ def _train_epoch(
         total_correct += (preds == targets).sum().item()
         total_loss += loss.item() * images.size(0)
         total_samples += images.size(0)
+        if progress_hook:
+            avg_loss = total_loss / max(1, total_samples)
+            avg_acc = total_correct / max(1, total_samples)
+            progress_hook(batch_idx, total_batches, avg_loss, avg_acc)
 
     return {
         "loss": total_loss / max(1, total_samples),
@@ -380,5 +430,56 @@ def _write_summary_md(path: Path, cfg: ExperimentConfig, payload: Dict[str, Any]
 
 
 def _write_progress(path: Path, payload: Dict[str, Any]) -> None:
-    safe_payload = {k: (float(v) if isinstance(v, (int, float)) else v) for k, v in payload.items()}
+    stats = _collect_system_stats()
+    merged = {**payload, **stats}
+    safe_payload = {k: (float(v) if isinstance(v, (int, float)) else v) for k, v in merged.items()}
     path.write_text(json.dumps(safe_payload, indent=2), encoding="utf-8")
+    _mirror_progress(safe_payload)
+
+
+def _mirror_progress(payload: Dict[str, Any]) -> None:
+    if not _PUBLIC_PROGRESS_PATH:
+        return
+    try:
+        _PUBLIC_PROGRESS_PATH.parent.mkdir(parents=True, exist_ok=True)
+        _PUBLIC_PROGRESS_PATH.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    except OSError:
+        # If the mirror path cannot be written (e.g., permissions), just skip silently.
+        pass
+
+
+def _collect_system_stats() -> Dict[str, Any]:
+    stats: Dict[str, Any] = {
+        "cpu_percent": None,
+        "ram_percent": None,
+        "gpu_percent": None,
+        "gpu_memory_used": None,
+        "gpu_memory_total": None,
+    }
+    if psutil is not None:
+        try:
+            stats["cpu_percent"] = psutil.cpu_percent(interval=None)
+            stats["ram_percent"] = psutil.virtual_memory().percent
+        except Exception:
+            pass
+    if torch.cuda.is_available():
+        try:
+            result = subprocess.run(
+                [
+                    "nvidia-smi",
+                    "--query-gpu=utilization.gpu,memory.used,memory.total",
+                    "--format=csv,noheader,nounits",
+                ],
+                capture_output=True,
+                text=True,
+                check=True,
+                timeout=1.0,
+            )
+            first_line = result.stdout.strip().splitlines()[0]
+            util_str, mem_used_str, mem_total_str = [part.strip() for part in first_line.split(",")]
+            stats["gpu_percent"] = float(util_str)
+            stats["gpu_memory_used"] = float(mem_used_str)
+            stats["gpu_memory_total"] = float(mem_total_str)
+        except Exception:
+            pass
+    return stats

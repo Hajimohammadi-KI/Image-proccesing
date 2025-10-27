@@ -125,7 +125,7 @@ Override on the fly with CLI flags (`--aug strong`, `--dataset-root ImageNetSubs
    python scripts/serve_progress.py --run-dir runs/cpu_cifar10/<timestamp>
    ```
    Replace `<timestamp>` with the folder created for your run. The script copies `progress_dashboard.html` into that directory and opens it in your browser.
-3. The HTML/JS page polls `progress.json` every few seconds and shows percent complete, train/val loss, accuracy, and elapsed time. Leave the server running until training finishes.
+3. The HTML/JS page polls `progress.json` every few seconds and shows percent complete, train/val loss, accuracy, elapsed time, plus live CPU/GPU usage metrics. Leave the server running until training finishes.
 
 ## Code layout
 ```

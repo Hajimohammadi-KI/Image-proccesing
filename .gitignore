@@ -14,3 +14,8 @@ robustness_dataset/
 .vscode/
 wandb/
 .history/
+node_modules/
+*.log
+web/progress-dashboard/.next/
+web/progress-dashboard/out/
+web/progress-dashboard/public/progress.json
