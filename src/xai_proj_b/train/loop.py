@@ -50,6 +50,12 @@ def run_training(cfg: ExperimentConfig) -> Dict[str, float]:
     seed_results = []
     summary_entries = []
 
+    if torch.cuda.is_available():
+        try:
+            torch.cuda.set_per_process_memory_fraction(0.95, torch.cuda.current_device())
+        except RuntimeError:
+            pass
+
     progress_path = run_dir / "progress.json"
     run_start = time.time()
     _write_progress(

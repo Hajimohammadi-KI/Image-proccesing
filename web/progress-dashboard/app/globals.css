@@ -81,6 +81,58 @@ h1 {
   margin-top: 20px;
 }
 
+.gaugeGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 18px;
+  margin-top: 28px;
+}
+
+.gaugeCard {
+  background: var(--card-bg-alt);
+  border-radius: 14px;
+  padding: 22px 16px 20px;
+  border: 1px solid var(--card-border);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+
+.gaugeShell {
+  width: 132px;
+  height: 132px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: conic-gradient(var(--accent) 0%, rgba(0, 0, 0, 0.08) 0% 100%);
+  transition: background 0.4s ease;
+}
+
+.gaugeCore {
+  width: 88px;
+  height: 88px;
+  border-radius: 50%;
+  background: var(--card);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
+}
+
+.gaugeValue {
+  font-size: 1.45rem;
+  font-weight: 700;
+}
+
+.gaugeSubtitle {
+  font-size: 0.9rem;
+  color: var(--muted);
+  font-weight: 600;
+}
+
 .statCard {
   background: var(--card-bg-alt);
   border-radius: 12px;
@@ -132,5 +184,15 @@ h1 {
 
   .progressWrapper {
     height: 24px;
+  }
+
+  .gaugeShell {
+    width: 112px;
+    height: 112px;
+  }
+
+  .gaugeCore {
+    width: 76px;
+    height: 76px;
   }
 }

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { StatCard } from '../components/StatCard';
+import { GaugeCard, StatCard } from '../components/StatCard';
 import type { ProgressData } from '../types/progress';
 
 const POLL_INTERVAL_MS = 5000;
@@ -18,6 +18,17 @@ function formatPercent(value: number | null | undefined, digits = 0): string {
     return '-';
   }
   return `${Number(value).toFixed(digits)}%`;
+}
+
+function sanitizePercent(value: number | null | undefined): number | null {
+  if (value === null || value === undefined) {
+    return null;
+  }
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    return null;
+  }
+  return Math.min(100, Math.max(0, numeric));
 }
 
 function formatMemory(
@@ -116,6 +127,10 @@ export default function DashboardPage() {
 
   const percent = useMemo(() => getProgressPercent(data), [data]);
 
+  const cpuPercent = useMemo(() => sanitizePercent(data?.cpu_percent), [data?.cpu_percent]);
+  const ramPercent = useMemo(() => sanitizePercent(data?.ram_percent), [data?.ram_percent]);
+  const gpuPercent = useMemo(() => sanitizePercent(data?.gpu_percent), [data?.gpu_percent]);
+
   const progressLabel = useMemo(() => {
     if (!data || !data.total_epochs || !data.current_epoch) {
       return 'Waiting for data...';
@@ -137,15 +152,30 @@ export default function DashboardPage() {
         </div>
         <div className="progressText">{progressLabel}</div>
 
+        <div className="gaugeGrid">
+          <GaugeCard
+            label="CPU Engagement"
+            percent={cpuPercent}
+            subtitle={formatPercent(data?.cpu_percent)}
+          />
+          <GaugeCard
+            label="RAM Engagement"
+            percent={ramPercent}
+            subtitle={formatPercent(data?.ram_percent)}
+          />
+          <GaugeCard
+            label="GPU Engagement"
+            percent={gpuPercent}
+            subtitle={formatPercent(data?.gpu_percent)}
+          />
+        </div>
+
         <div className="statsGrid">
           <StatCard label="Status" value={status} />
           <StatCard label="Train Loss" value={formatNumber(data?.train_loss)} />
           <StatCard label="Val Loss" value={formatNumber(data?.val_loss)} />
           <StatCard label="Val Acc@1" value={formatNumber(data?.val_acc1, 4)} />
           <StatCard label="Elapsed" value={formatElapsed(data?.elapsed_sec)} />
-          <StatCard label="CPU Load" value={formatPercent(data?.cpu_percent)} />
-          <StatCard label="RAM Usage" value={formatPercent(data?.ram_percent)} />
-          <StatCard label="GPU Load" value={formatPercent(data?.gpu_percent)} />
           <StatCard
             label="GPU Memory"
             value={formatMemory(data?.gpu_memory_used, data?.gpu_memory_total)}

@@ -5,12 +5,14 @@ dataset:
   name: cifar10
   root: data/cifar10
   batch_size: 256
-  num_workers: 8
+  num_workers: 2
   img_size: 128
   aug: configs/aug/weak.yaml
   val_split: 0.1
   download: true
   pin_memory: true
+  persistent_workers: false
+  drop_last: true
 
 model:
   name: resnet18
